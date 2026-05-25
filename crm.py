@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
+# Standard library
 import os
 import sys
 from datetime import date, timedelta
 
+# Third-party: CLI framework, env vars, Notion SDK, terminal UI
 import click
 from dotenv import load_dotenv
 from notion_client import Client
 from rich.console import Console
 from rich.table import Table
 
+# Reads NOTION_API_KEY from a .env file in the project root
 load_dotenv()
 
+# Hardcoded Notion database IDs — found in the database URL on notion.so
 CONTACTS_DB_ID = "d87f84dc2ca046109a9eb0ce371ff690"
 OUTREACH_LOG_DB_ID = "d956c7018ed04d2cbc48dcaa9b926ab8"
 
@@ -18,6 +22,7 @@ console = Console()
 
 
 def get_client():
+    # Fails fast if the API key is missing rather than letting Notion return a 401
     key = os.getenv("NOTION_API_KEY")
     if not key:
         console.print("[red]Error: NOTION_API_KEY not set. Add it to a .env file.[/red]")
@@ -26,6 +31,7 @@ def get_client():
 
 
 def extract(prop):
+    # Notion returns properties as typed objects; this normalises any type to a plain string
     if not prop:
         return ""
     t = prop.get("type")
@@ -49,6 +55,7 @@ def extract(prop):
 
 
 def prompt_date(label):
+    # Loops until the user enters a valid ISO date or leaves it blank
     while True:
         val = click.prompt(f"{label} (YYYY-MM-DD, blank to skip)", default="")
         if not val:
@@ -61,6 +68,7 @@ def prompt_date(label):
 
 
 def find_contact(notion: Client, query: str):
+    # Searches contacts by name; if multiple match, prompts the user to pick one
     results = notion.databases.query(
         database_id=CONTACTS_DB_ID,
         filter={"property": "Name", "title": {"contains": query}},
@@ -79,6 +87,9 @@ def find_contact(notion: Client, query: str):
     idx = click.prompt("Select number", type=int) - 1
     return results[idx] if 0 <= idx < len(results) else None
 
+
+# --- CLI entry point ---
+# Each function decorated with @cli.command() becomes a subcommand, e.g. `python crm.py add`
 
 @click.group()
 def cli():
@@ -118,6 +129,8 @@ def add():
     notes = click.prompt("Notes", default="")
     followup = prompt_date("Next follow-up")
 
+    # Build the properties dict — only include fields that have a value, since
+    # sending an empty string to Notion can overwrite existing data with blanks
     props = {"Name": {"title": [{"text": {"content": name}}]}}
     if email:
         props["Email"] = {"email": email}
@@ -142,6 +155,7 @@ def add():
     if followup:
         props["Next Follow-up"] = {"date": {"start": followup}}
 
+    # Only allow known tag values to prevent typos creating junk options in Notion
     valid_tags = {"investor", "warm", "cold", "partner", "client", "advisor"}
     tags = [{"name": t.strip()} for t in tags_raw.split(",") if t.strip() in valid_tags]
     if tags:
@@ -190,6 +204,7 @@ def log():
     followup = prompt_date("Next follow-up")
     notes = click.prompt("Notes", default="")
 
+    # Create a new row in the Outreach Log database linked back to the contact
     log_props = {
         "Summary": {"title": [{"text": {"content": summary}}]},
         "Contact": {"relation": [{"id": contact["id"]}]},
@@ -205,6 +220,7 @@ def log():
 
     notion.pages.create(parent={"database_id": OUTREACH_LOG_DB_ID}, properties=log_props)
 
+    # Also update the contact record so Last Contact and Next Follow-up stay current
     contact_updates = {"Last Contact": {"date": {"start": log_date}}}
     if followup:
         contact_updates["Next Follow-up"] = {"date": {"start": followup}}
@@ -222,6 +238,7 @@ def list_contacts(status, tag):
     """List all contacts."""
     notion = get_client()
 
+    # Build filters dynamically so we can combine status and tag independently
     filters = []
     if status:
         filters.append({"property": "Status", "select": {"equals": status}})
@@ -308,6 +325,7 @@ def followups(days):
     today = date.today()
     end = today + timedelta(days=days)
 
+    # Filters to contacts with a follow-up date set, due within the window, and not Dead
     pages = notion.databases.query(
         database_id=CONTACTS_DB_ID,
         filter={
@@ -374,6 +392,7 @@ def show(name):
         if val:
             console.print(f"  [bold]{label}:[/bold] {val}")
 
+    # Fetch all outreach log entries that are related to this contact
     logs = notion.databases.query(
         database_id=OUTREACH_LOG_DB_ID,
         filter={"property": "Contact", "relation": {"contains": contact["id"]}},

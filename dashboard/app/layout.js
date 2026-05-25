@@ -5,11 +5,18 @@ export const metadata = { title: "Network Outreach" };
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body className="bg-gray-50 text-gray-900 min-h-screen">
-        <header className="bg-white border-b border-gray-200 px-6 py-4">
-          <h1 className="text-lg font-semibold">Network Outreach</h1>
+      <body className="bg-gray-950 text-white min-h-screen">
+        <header className="border-b border-gray-800">
+          <div className="px-8 py-5 flex items-center justify-between">
+            <div>
+              <p className="text-xs tracking-widest uppercase text-blue-500 font-medium mb-0.5">
+                Network Outreach
+              </p>
+              <h1 className="text-xl font-semibold tracking-tight">CRM Dashboard</h1>
+            </div>
+          </div>
         </header>
-        <main className="px-6 py-6">{children}</main>
+        <main className="px-8 py-8">{children}</main>
       </body>
     </html>
   );
