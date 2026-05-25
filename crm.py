@@ -48,6 +48,18 @@ def extract(prop):
     return ""
 
 
+def prompt_date(label):
+    while True:
+        val = click.prompt(f"{label} (YYYY-MM-DD, blank to skip)", default="")
+        if not val:
+            return ""
+        try:
+            date.fromisoformat(val)
+            return val
+        except ValueError:
+            console.print("[red]Invalid date. Use format YYYY-MM-DD, e.g. 2026-06-01[/red]")
+
+
 def find_contact(notion: Client, query: str):
     results = notion.databases.query(
         database_id=CONTACTS_DB_ID,
@@ -104,7 +116,7 @@ def add():
     )
     tags_raw = click.prompt("Tags (investor, warm, cold, partner, client, advisor)", default="")
     notes = click.prompt("Notes", default="")
-    followup = click.prompt("Next follow-up (YYYY-MM-DD, blank to skip)", default="")
+    followup = prompt_date("Next follow-up")
 
     props = {"Name": {"title": [{"text": {"content": name}}]}}
     if email:
@@ -156,6 +168,11 @@ def log():
 
     summary = click.prompt("Summary (e.g. 'Intro email sent')")
     log_date = click.prompt("Date (YYYY-MM-DD)", default=date.today().isoformat())
+    try:
+        date.fromisoformat(log_date)
+    except ValueError:
+        console.print("[red]Invalid date. Use YYYY-MM-DD format.[/red]")
+        return
     channel = click.prompt(
         "Channel",
         type=click.Choice(["Email", "LinkedIn", "Phone", "In-person", "Event", "Other"]),
@@ -170,7 +187,7 @@ def log():
         type=click.Choice(["Yes", "No", "Pending", "N/A"]),
         default="Pending",
     )
-    followup = click.prompt("Next follow-up (YYYY-MM-DD, blank to skip)", default="")
+    followup = prompt_date("Next follow-up")
     notes = click.prompt("Notes", default="")
 
     log_props = {
